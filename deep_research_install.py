@@ -151,6 +151,16 @@ async def install(
     bot_version: str,
     tools: list[ckit_cloudtool.CloudTool],
 ):
+    import subprocess
+    import os
+
+    bot_dir = os.path.dirname(os.path.abspath(__file__))
+    requirements_path = os.path.join(bot_dir, "requirements.txt")
+
+    if os.path.exists(requirements_path):
+        print(f"Installing dependencies from {requirements_path}")
+        subprocess.run(["pip", "install", "-r", requirements_path], check=True)
+
     import deep_research_bot
     bot_internal_tools = json.dumps([t.openai_style_tool() for t in tools])
     bot_subchat_tools = json.dumps([t.openai_style_tool() for t in deep_research_bot.TOOLS_SUBCHAT])

@@ -5,6 +5,7 @@ import time
 from typing import Dict, Any, Optional
 
 from pymongo import AsyncMongoClient
+from duckduckgo_search import DDGS
 
 from flexus_client_kit import ckit_client
 from flexus_client_kit import ckit_cloudtool
@@ -22,7 +23,7 @@ logger = logging.getLogger("bot_deep_research")
 
 
 BOT_NAME = "deep_research"
-BOT_VERSION = "0.0.4"
+BOT_VERSION = "0.0.5"
 
 
 # Tool for initiating web research
@@ -185,31 +186,45 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
 
         effective_date_filter = date_filter if date_filter else setup.get("date_range", "any")
 
-        date_instruction = ""
-        if effective_date_filter != "any":
-            if effective_date_filter == "custom":
-                date_from = setup.get("custom_date_from", "")
-                date_to = setup.get("custom_date_to", "")
-                if date_from and date_to:
-                    date_instruction = f" Filter results to date range: {date_from} to {date_to}."
-                elif date_from:
-                    date_instruction = f" Filter results from {date_from} onwards."
-                elif date_to:
-                    date_instruction = f" Filter results up to {date_to}."
-            else:
-                date_instruction = f" Filter results to {effective_date_filter.replace('_', ' ')}."
+        timelimit = None
+        if effective_date_filter == "last_week":
+            timelimit = "w"
+        elif effective_date_filter == "last_month":
+            timelimit = "m"
+        elif effective_date_filter == "last_year":
+            timelimit = "y"
 
-        subchats = await ckit_ask_model.bot_subchat_create_multiple(
-            client=fclient,
-            who_is_asking="deep_research_web_search",
-            persona_id=rcx.persona.persona_id,
-            first_question=[f"Search the web for: '{query}'.{date_instruction} Return the top {max_results} most relevant results with titles, URLs, and brief snippets." for query in queries],
-            first_calls=["null" for _ in queries],
-            title=[f"Searching: {query[:50]}..." for query in queries],
-            fcall_id=toolcall.fcall_id,
-            fexp_name="researcher",
-        )
-        raise ckit_cloudtool.WaitForSubchats(subchats)
+        region = "wt-wt"
+        research_language = setup.get("research_language", "en")
+        if research_language and research_language != "en":
+            region = f"{research_language}-{research_language}"
+
+        all_results = []
+        try:
+            with DDGS() as ddgs:
+                for query in queries:
+                    try:
+                        results = list(ddgs.text(query, region=region, timelimit=timelimit, max_results=max_results))
+                        query_results = {
+                            "query": query,
+                            "results": [
+                                {
+                                    "title": r.get("title", ""),
+                                    "url": r.get("href", ""),
+                                    "snippet": r.get("body", ""),
+                                }
+                                for r in results
+                            ],
+                        }
+                        all_results.append(query_results)
+                    except Exception as e:
+                        logger.error(f"Search error for query '{query}': {e}")
+                        all_results.append({"query": query, "error": str(e)})
+        except Exception as e:
+            logger.error(f"DDGS initialization error: {e}")
+            return f"Error: Failed to initialize search: {e}"
+
+        return json.dumps(all_results, indent=2)
 
     @rcx.on_tool_call(READ_ARTICLE_TOOL.name)
     async def toolcall_read_article(toolcall: ckit_cloudtool.FCloudtoolCall, model_produced_args: Dict[str, Any]) -> str:
