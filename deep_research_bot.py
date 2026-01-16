@@ -22,7 +22,7 @@ logger = logging.getLogger("bot_deep_research")
 
 
 BOT_NAME = "deep_research"
-BOT_VERSION = "0.0.3"
+BOT_VERSION = "0.0.4"
 
 
 # Tool for initiating web research
@@ -42,8 +42,12 @@ WEB_RESEARCH_TOOL = ckit_cloudtool.CloudTool(
                 "type": "integer",
                 "description": "Maximum number of results to return per query (default 5)"
             },
+            "date_filter": {
+                "type": ["string", "null"],
+                "description": "Optional date filter override: 'any', 'last_week', 'last_month', 'last_year', or null to use setup default"
+            },
         },
-        "required": ["queries", "max_results_per_query"],
+        "required": ["queries", "max_results_per_query", "date_filter"],
         "additionalProperties": False,
     },
 )
@@ -163,6 +167,7 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
     async def toolcall_web_research(toolcall: ckit_cloudtool.FCloudtoolCall, model_produced_args: Dict[str, Any]) -> str:
         queries = model_produced_args.get("queries", [])
         max_results = model_produced_args.get("max_results_per_query", 5)
+        date_filter = model_produced_args.get("date_filter")
 
         if not queries:
             return "Error: No search queries provided."
@@ -170,7 +175,6 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
         if len(queries) > 5:
             return f"Error: Maximum 5 queries allowed per call. You provided {len(queries)}."
 
-        # Track depth usage
         used = research_depth_used.get(toolcall.fcall_ft_id, 0)
         remaining = setup["max_research_depth"] - used
 
@@ -179,12 +183,27 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
 
         research_depth_used[toolcall.fcall_ft_id] = used + len(queries)
 
-        # Create subchats for parallel web searches
+        effective_date_filter = date_filter if date_filter else setup.get("date_range", "any")
+
+        date_instruction = ""
+        if effective_date_filter != "any":
+            if effective_date_filter == "custom":
+                date_from = setup.get("custom_date_from", "")
+                date_to = setup.get("custom_date_to", "")
+                if date_from and date_to:
+                    date_instruction = f" Filter results to date range: {date_from} to {date_to}."
+                elif date_from:
+                    date_instruction = f" Filter results from {date_from} onwards."
+                elif date_to:
+                    date_instruction = f" Filter results up to {date_to}."
+            else:
+                date_instruction = f" Filter results to {effective_date_filter.replace('_', ' ')}."
+
         subchats = await ckit_ask_model.bot_subchat_create_multiple(
             client=fclient,
             who_is_asking="deep_research_web_search",
             persona_id=rcx.persona.persona_id,
-            first_question=[f"Search the web for: '{query}'. Return the top {max_results} most relevant results with titles, URLs, and brief snippets." for query in queries],
+            first_question=[f"Search the web for: '{query}'.{date_instruction} Return the top {max_results} most relevant results with titles, URLs, and brief snippets." for query in queries],
             first_calls=["null" for _ in queries],
             title=[f"Searching: {query[:50]}..." for query in queries],
             fcall_id=toolcall.fcall_id,

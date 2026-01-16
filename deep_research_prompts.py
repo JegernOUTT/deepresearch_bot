@@ -77,11 +77,12 @@ PROMPT_WEB_RESEARCH_TOOLS = """
 
 You have specialized tools for conducting deep research:
 
-**web_research(queries, max_results_per_query)**
+**web_research(queries, max_results_per_query, date_filter)**
 - Performs parallel web searches
 - Use 3-5 focused queries for comprehensive coverage
 - Returns titles, URLs, and snippets
 - Limited by max_research_depth from setup
+- date_filter: Optional override for date range ('any', 'last_week', 'last_month', 'last_year', or null to use setup default)
 
 **read_article(urls, focus)**
 - Reads and analyzes web content in parallel
@@ -98,6 +99,7 @@ You have specialized tools for conducting deep research:
 - Start with broad queries, then narrow down based on results
 - Read the most promising articles first to validate relevance
 - Use the 'focus' parameter when looking for specific information
+- Use date_filter parameter to override setup date range for specific searches
 - Create interim notes using mongo_store() for complex research
 - Always create a final research report for completed research tasks
 """
@@ -120,7 +122,7 @@ Your approach:
 * Provide comprehensive coverage of the research topic
 * Present findings in a clear, organized manner
 
-Your setup includes max_research_depth which limits the number of parallel searches per research session and research_language which specifies the preferred language for sources and research output.
+Your setup includes max_research_depth which limits the number of parallel searches per research session, research_language which specifies the preferred language for sources and research output, and date_range settings to control the recency of search results.
 
 {prompts_common.PROMPT_KANBAN}
 {prompts_common.PROMPT_PRINT_WIDGET}
