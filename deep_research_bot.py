@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 
 from pymongo import AsyncMongoClient
 from duckduckgo_search import DDGS
+from newspaper import Article
 
 from flexus_client_kit import ckit_client
 from flexus_client_kit import ckit_cloudtool
@@ -23,7 +24,7 @@ logger = logging.getLogger("bot_deep_research")
 
 
 BOT_NAME = "deep_research"
-BOT_VERSION = "0.0.5"
+BOT_VERSION = "0.0.6"
 
 
 # Tool for initiating web research
@@ -237,20 +238,27 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
         if len(urls) > 10:
             return f"Error: Maximum 10 URLs allowed per call. You provided {len(urls)}."
 
-        focus_instruction = f" Focus specifically on: {focus}." if focus else ""
+        results = []
+        for url in urls:
+            try:
+                article = Article(url)
+                article.download()
+                article.parse()
 
-        # Create subchats for parallel article reading
-        subchats = await ckit_ask_model.bot_subchat_create_multiple(
-            client=fclient,
-            who_is_asking="deep_research_read_article",
-            persona_id=rcx.persona.persona_id,
-            first_question=[f"Read and analyze the content from this URL: {url}. Extract the main points, key insights, and relevant information.{focus_instruction}" for url in urls],
-            first_calls=["null" for _ in urls],
-            title=[f"Reading: {url[:50]}..." for url in urls],
-            fcall_id=toolcall.fcall_id,
-            fexp_name="researcher",
-        )
-        raise ckit_cloudtool.WaitForSubchats(subchats)
+                result = {
+                    "url": url,
+                    "title": article.title,
+                    "authors": article.authors,
+                    "publish_date": str(article.publish_date) if article.publish_date else None,
+                    "text": article.text[:5000],
+                    "summary": article.text[:500] + "..." if len(article.text) > 500 else article.text,
+                }
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Error reading article {url}: {e}")
+                results.append({"url": url, "error": str(e)})
+
+        return json.dumps(results, indent=2)
 
     @rcx.on_tool_call(CREATE_RESEARCH_REPORT_TOOL.name)
     async def toolcall_create_research_report(toolcall: ckit_cloudtool.FCloudtoolCall, model_produced_args: Dict[str, Any]) -> str:
