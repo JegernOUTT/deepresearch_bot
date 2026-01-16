@@ -60,6 +60,15 @@ deep_research_setup_schema = [
         "bs_description": "Source priority: 'authoritative' (official/academic), 'diverse' (broad range), 'recent' (latest info)",
     },
     {
+        "bs_name": "research_language",
+        "bs_type": "string_short",
+        "bs_default": "en",
+        "bs_group": "Research Approach",
+        "bs_order": 3,
+        "bs_importance": 0,
+        "bs_description": "Language for research (e.g., 'en' for English, 'es' for Spanish, 'fr' for French, 'de' for German)",
+    },
+    {
         "bs_name": "max_research_depth",
         "bs_type": "int",
         "bs_default": 10,

@@ -58,6 +58,7 @@ Follow this systematic approach to conduct deep research:
 
 **Research Quality Guidelines:**
 - Prioritize authoritative sources (academic papers, official documentation, reputable news)
+- Use sources in the language specified by research_language setting when available
 - Cross-reference information from multiple sources when possible
 - Note when information is speculative, outdated, or from single sources
 - Be explicit about confidence levels based on source quality and consensus
@@ -119,7 +120,7 @@ Your approach:
 * Provide comprehensive coverage of the research topic
 * Present findings in a clear, organized manner
 
-Your setup includes max_research_depth which limits the number of parallel searches per research session.
+Your setup includes max_research_depth which limits the number of parallel searches per research session and research_language which specifies the preferred language for sources and research output.
 
 {prompts_common.PROMPT_KANBAN}
 {prompts_common.PROMPT_PRINT_WIDGET}
