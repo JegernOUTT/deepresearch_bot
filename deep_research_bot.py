@@ -22,7 +22,7 @@ logger = logging.getLogger("bot_deep_research")
 
 
 BOT_NAME = "deep_research"
-BOT_VERSION = "0.0.1"
+BOT_VERSION = "0.0.2"
 
 
 # Tool for initiating web research

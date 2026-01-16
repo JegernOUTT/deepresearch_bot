@@ -100,7 +100,10 @@ if msg["role"] == "assistant":
 
     # Remind to create report if research seems complete
     if len(messages) > 5 and "create_research_report" not in tool_calls:
-        if any(keyword in content.lower() for keyword in ["conclusion", "findings", "summary", "complete"]):
+        content_lower = content.lower()
+        keywords = ["conclusion", "findings", "summary", "complete"]
+        matches = [k for k in keywords if k in content_lower]
+        if len(matches) > 0:
             post_cd_instruction = "Consider creating a research report to document your findings."
 """
 
