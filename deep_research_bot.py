@@ -5,6 +5,8 @@ import time
 from typing import Dict, Any, Optional
 
 from pymongo import AsyncMongoClient
+from duckduckgo_search import DDGS
+from newspaper import Article
 
 from flexus_client_kit import ckit_client
 from flexus_client_kit import ckit_cloudtool
@@ -22,7 +24,7 @@ logger = logging.getLogger("bot_deep_research")
 
 
 BOT_NAME = "deep_research"
-BOT_VERSION = "0.0.1"
+BOT_VERSION = "0.0.6"
 
 
 # Tool for initiating web research
@@ -42,8 +44,12 @@ WEB_RESEARCH_TOOL = ckit_cloudtool.CloudTool(
                 "type": "integer",
                 "description": "Maximum number of results to return per query (default 5)"
             },
+            "date_filter": {
+                "type": ["string", "null"],
+                "description": "Optional date filter override: 'any', 'last_week', 'last_month', 'last_year', or null to use setup default"
+            },
         },
-        "required": ["queries", "max_results_per_query"],
+        "required": ["queries", "max_results_per_query", "date_filter"],
         "additionalProperties": False,
     },
 )
@@ -163,6 +169,7 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
     async def toolcall_web_research(toolcall: ckit_cloudtool.FCloudtoolCall, model_produced_args: Dict[str, Any]) -> str:
         queries = model_produced_args.get("queries", [])
         max_results = model_produced_args.get("max_results_per_query", 5)
+        date_filter = model_produced_args.get("date_filter")
 
         if not queries:
             return "Error: No search queries provided."
@@ -170,7 +177,6 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
         if len(queries) > 5:
             return f"Error: Maximum 5 queries allowed per call. You provided {len(queries)}."
 
-        # Track depth usage
         used = research_depth_used.get(toolcall.fcall_ft_id, 0)
         remaining = setup["max_research_depth"] - used
 
@@ -179,18 +185,47 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
 
         research_depth_used[toolcall.fcall_ft_id] = used + len(queries)
 
-        # Create subchats for parallel web searches
-        subchats = await ckit_ask_model.bot_subchat_create_multiple(
-            client=fclient,
-            who_is_asking="deep_research_web_search",
-            persona_id=rcx.persona.persona_id,
-            first_question=[f"Search the web for: '{query}'. Return the top {max_results} most relevant results with titles, URLs, and brief snippets." for query in queries],
-            first_calls=["null" for _ in queries],
-            title=[f"Searching: {query[:50]}..." for query in queries],
-            fcall_id=toolcall.fcall_id,
-            fexp_name="researcher",
-        )
-        raise ckit_cloudtool.WaitForSubchats(subchats)
+        effective_date_filter = date_filter if date_filter else setup.get("date_range", "any")
+
+        timelimit = None
+        if effective_date_filter == "last_week":
+            timelimit = "w"
+        elif effective_date_filter == "last_month":
+            timelimit = "m"
+        elif effective_date_filter == "last_year":
+            timelimit = "y"
+
+        region = "wt-wt"
+        research_language = setup.get("research_language", "en")
+        if research_language and research_language != "en":
+            region = f"{research_language}-{research_language}"
+
+        all_results = []
+        try:
+            with DDGS() as ddgs:
+                for query in queries:
+                    try:
+                        results = list(ddgs.text(query, region=region, timelimit=timelimit, max_results=max_results))
+                        query_results = {
+                            "query": query,
+                            "results": [
+                                {
+                                    "title": r.get("title", ""),
+                                    "url": r.get("href", ""),
+                                    "snippet": r.get("body", ""),
+                                }
+                                for r in results
+                            ],
+                        }
+                        all_results.append(query_results)
+                    except Exception as e:
+                        logger.error(f"Search error for query '{query}': {e}")
+                        all_results.append({"query": query, "error": str(e)})
+        except Exception as e:
+            logger.error(f"DDGS initialization error: {e}")
+            return f"Error: Failed to initialize search: {e}"
+
+        return json.dumps(all_results, indent=2)
 
     @rcx.on_tool_call(READ_ARTICLE_TOOL.name)
     async def toolcall_read_article(toolcall: ckit_cloudtool.FCloudtoolCall, model_produced_args: Dict[str, Any]) -> str:
@@ -203,20 +238,27 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
         if len(urls) > 10:
             return f"Error: Maximum 10 URLs allowed per call. You provided {len(urls)}."
 
-        focus_instruction = f" Focus specifically on: {focus}." if focus else ""
+        results = []
+        for url in urls:
+            try:
+                article = Article(url)
+                article.download()
+                article.parse()
 
-        # Create subchats for parallel article reading
-        subchats = await ckit_ask_model.bot_subchat_create_multiple(
-            client=fclient,
-            who_is_asking="deep_research_read_article",
-            persona_id=rcx.persona.persona_id,
-            first_question=[f"Read and analyze the content from this URL: {url}. Extract the main points, key insights, and relevant information.{focus_instruction}" for url in urls],
-            first_calls=["null" for _ in urls],
-            title=[f"Reading: {url[:50]}..." for url in urls],
-            fcall_id=toolcall.fcall_id,
-            fexp_name="researcher",
-        )
-        raise ckit_cloudtool.WaitForSubchats(subchats)
+                result = {
+                    "url": url,
+                    "title": article.title,
+                    "authors": article.authors,
+                    "publish_date": str(article.publish_date) if article.publish_date else None,
+                    "text": article.text[:5000],
+                    "summary": article.text[:500] + "..." if len(article.text) > 500 else article.text,
+                }
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Error reading article {url}: {e}")
+                results.append({"url": url, "error": str(e)})
+
+        return json.dumps(results, indent=2)
 
     @rcx.on_tool_call(CREATE_RESEARCH_REPORT_TOOL.name)
     async def toolcall_create_research_report(toolcall: ckit_cloudtool.FCloudtoolCall, model_produced_args: Dict[str, Any]) -> str:

@@ -60,6 +60,42 @@ deep_research_setup_schema = [
         "bs_description": "Source priority: 'authoritative' (official/academic), 'diverse' (broad range), 'recent' (latest info)",
     },
     {
+        "bs_name": "research_language",
+        "bs_type": "string_short",
+        "bs_default": "en",
+        "bs_group": "Research Approach",
+        "bs_order": 3,
+        "bs_importance": 0,
+        "bs_description": "Language for research (e.g., 'en' for English, 'es' for Spanish, 'fr' for French, 'de' for German)",
+    },
+    {
+        "bs_name": "date_range",
+        "bs_type": "string_short",
+        "bs_default": "any",
+        "bs_group": "Research Approach",
+        "bs_order": 4,
+        "bs_importance": 0,
+        "bs_description": "Date range for search results: 'any', 'last_week', 'last_month', 'last_year', 'custom'",
+    },
+    {
+        "bs_name": "custom_date_from",
+        "bs_type": "string_short",
+        "bs_default": "",
+        "bs_group": "Research Approach",
+        "bs_order": 5,
+        "bs_importance": 0,
+        "bs_description": "Start date for custom range (YYYY-MM-DD format, only used when date_range is 'custom')",
+    },
+    {
+        "bs_name": "custom_date_to",
+        "bs_type": "string_short",
+        "bs_default": "",
+        "bs_group": "Research Approach",
+        "bs_order": 6,
+        "bs_importance": 0,
+        "bs_description": "End date for custom range (YYYY-MM-DD format, only used when date_range is 'custom')",
+    },
+    {
         "bs_name": "max_research_depth",
         "bs_type": "int",
         "bs_default": 10,
@@ -100,7 +136,10 @@ if msg["role"] == "assistant":
 
     # Remind to create report if research seems complete
     if len(messages) > 5 and "create_research_report" not in tool_calls:
-        if any(keyword in content.lower() for keyword in ["conclusion", "findings", "summary", "complete"]):
+        content_lower = content.lower()
+        keywords = ["conclusion", "findings", "summary", "complete"]
+        matches = [k for k in keywords if k in content_lower]
+        if len(matches) > 0:
             post_cd_instruction = "Consider creating a research report to document your findings."
 """
 
@@ -112,6 +151,16 @@ async def install(
     bot_version: str,
     tools: list[ckit_cloudtool.CloudTool],
 ):
+    import subprocess
+    import os
+
+    bot_dir = os.path.dirname(os.path.abspath(__file__))
+    requirements_path = os.path.join(bot_dir, "requirements.txt")
+
+    if os.path.exists(requirements_path):
+        print(f"Installing dependencies from {requirements_path}")
+        subprocess.run(["pip", "install", "-r", requirements_path], check=True)
+
     import deep_research_bot
     bot_internal_tools = json.dumps([t.openai_style_tool() for t in tools])
     bot_subchat_tools = json.dumps([t.openai_style_tool() for t in deep_research_bot.TOOLS_SUBCHAT])
