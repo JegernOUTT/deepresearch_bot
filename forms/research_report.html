@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Research Report</title>
+  <link rel="stylesheet" href="https://unpkg.com/primeicons@7.0.0/primeicons.css">
+  <style>
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* Paper on dark desk pattern - matches WorksheetEditor.vue, theme-aware */
+    body { background: var(--p-content-hover-background); margin: 0; padding: 10px; }
+    .paper {
+      width: 600px; padding: 24px; min-height: calc(100vh - 20px);
+      background: var(--p-primary-contrast-color); color: var(--p-primary-color);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .meta-box {
+      width: 100%; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 2rem; padding: 1rem;
+      border: 2px dashed var(--p-text-muted-color); border-radius: 8px; position: relative; font-size: 0.8rem;
+      animation: fadeIn 0.3s ease-out;
+    }
+    .meta-label {
+      position: absolute; top: -0.65rem; left: 1rem; background: var(--p-primary-contrast-color);
+      padding: 0 0.5rem; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; color: var(--p-text-muted-color);
+    }
+    .header-row { display: flex; gap: 0.5rem; }
+    .header-row label { font-weight: 600; color: var(--p-text-muted-color); }
+    h1 { font-size: 1.5rem; font-weight: 600; color: var(--p-primary-color); margin: 0 0 1.5rem 0; }
+    .field { margin-bottom: 1.5rem; width: 100%; animation: fadeIn 0.4s ease-out; }
+    .field > label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.875rem; }
+    input, textarea, select {
+      border: 1px solid var(--p-surface-border); border-radius: 6px;
+      padding: 0.5rem 0.75rem; font-size: 1rem; font-family: inherit; box-sizing: border-box;
+      background: var(--p-content-hover-background); color: var(--p-text-color);
+      transition: border-color 0.15s ease; width: 100%;
+    }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--p-primary-color); }
+    select option { background: var(--p-content-hover-background); color: var(--p-text-color); }
+    textarea {
+      resize: vertical; min-height: 80px; font-family: inherit; line-height: 1.5;
+    }
+    textarea.large { min-height: 200px; }
+    .badge {
+      display: inline-block; padding: 0.25rem 0.75rem; border-radius: 12px;
+      font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .badge.high { background: #d4edda; color: #155724; }
+    .badge.medium { background: #fff3cd; color: #856404; }
+    .badge.low { background: #f8d7da; color: #721c24; }
+    .sources-list {
+      list-style: none; padding: 0; margin: 0;
+    }
+    .sources-list li {
+      padding: 0.5rem; margin-bottom: 0.5rem; border-left: 3px solid var(--p-primary-color);
+      background: var(--p-content-hover-background); border-radius: 4px;
+      word-break: break-all;
+    }
+    .findings-list {
+      list-style: none; padding: 0; margin: 0;
+    }
+    .findings-list li {
+      padding: 0.75rem; margin-bottom: 0.75rem; border-radius: 6px;
+      background: var(--p-content-hover-background); position: relative; padding-left: 2.5rem;
+    }
+    .findings-list li:before {
+      content: "✓"; position: absolute; left: 0.75rem; font-weight: bold;
+      color: var(--p-primary-color); font-size: 1.2rem;
+    }
+  </style>
+  <style id="theme-css"></style>
+</head>
+<body>
+  <div class="paper">
+    <div class="meta-box">
+      <div class="meta-label">RESEARCH_REPORT</div>
+      <div class="header-row">
+        <label>Created:</label>
+        <span id="meta_created">—</span>
+      </div>
+      <div class="header-row">
+        <label>By:</label>
+        <span id="meta_created_by">—</span>
+      </div>
+    </div>
+
+    <h1>📊 Research Report</h1>
+
+    <div class="field">
+      <label>Research Topic</label>
+      <input type="text" id="topic" placeholder="Main research topic..." oninput="notifyChange()" readonly>
+    </div>
+
+    <div class="field">
+      <label>Confidence Level</label>
+      <div>
+        <span id="confidence_badge" class="badge medium">MEDIUM</span>
+      </div>
+      <select id="confidence_level" onchange="updateConfidenceBadge(); notifyChange();" style="margin-top: 0.5rem;">
+        <option value="high">High - Strong evidence from multiple sources</option>
+        <option value="medium">Medium - Some uncertainty or limited sources</option>
+        <option value="low">Low - Insufficient data or conflicting information</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Executive Summary</label>
+      <textarea id="summary" placeholder="Brief overview of key findings..." oninput="notifyChange()"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Key Findings</label>
+      <ul class="findings-list" id="findings_display"></ul>
+      <textarea id="key_findings" placeholder="One finding per line..." oninput="updateFindings(); notifyChange();" style="margin-top: 0.5rem;"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Detailed Analysis</label>
+      <textarea class="large" id="detailed_analysis" placeholder="In-depth analysis with context, implications, and insights..." oninput="notifyChange()"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Sources</label>
+      <ul class="sources-list" id="sources_display"></ul>
+      <textarea id="sources" placeholder="One URL per line..." oninput="updateSources(); notifyChange();" style="margin-top: 0.5rem;"></textarea>
+    </div>
+  </div>
+
+  <script>
+    const FormBridge = {
+      handlers: {},
+      init(name) {
+        window.addEventListener('message', e => {
+          if (e.data?.type && this.handlers[e.data.type]) {
+            this.handlers[e.data.type].forEach(h => h(e.data));
+          }
+        });
+        setTimeout(() => this.send('FORM_READY', { formName: name }), 0);
+      },
+      send(type, data) { window.parent.postMessage({ type, ...data }, '*'); },
+      on(type, handler) {
+        if (!this.handlers[type]) this.handlers[type] = [];
+        this.handlers[type].push(handler);
+      }
+    };
+
+    let content = {};
+
+    FormBridge.on('INIT', data => {
+      content = data.content || {};
+      if (data.themeCss) document.getElementById('theme-css').textContent = data.themeCss;
+      render();
+    });
+
+    FormBridge.on('CONTENT_UPDATE', data => {
+      content = data.content || {};
+      render();
+    });
+
+    FormBridge.init('deep-research-report');
+
+    function render() {
+      const report = content.research_report || {};
+      document.getElementById('topic').value = report.topic || '';
+      document.getElementById('summary').value = report.summary || '';
+      document.getElementById('detailed_analysis').value = report.detailed_analysis || '';
+      document.getElementById('confidence_level').value = report.confidence_level || 'medium';
+
+      // Render key findings as text (one per line)
+      const findings = report.key_findings || [];
+      document.getElementById('key_findings').value = findings.join('\n');
+      updateFindings();
+
+      // Render sources as text (one per line)
+      const sources = report.sources || [];
+      document.getElementById('sources').value = sources.join('\n');
+      updateSources();
+
+      // Update meta
+      const meta = report.meta || {};
+      document.getElementById('meta_created').textContent = meta.created_at || '—';
+      document.getElementById('meta_created_by').textContent = meta.created_by || '—';
+
+      updateConfidenceBadge();
+    }
+
+    function updateFindings() {
+      const text = document.getElementById('key_findings').value;
+      const findings = text.split('\n').filter(f => f.trim());
+      const display = document.getElementById('findings_display');
+      display.innerHTML = findings.map(f => `<li>${escapeHtml(f)}</li>`).join('');
+    }
+
+    function updateSources() {
+      const text = document.getElementById('sources').value;
+      const sources = text.split('\n').filter(s => s.trim());
+      const display = document.getElementById('sources_display');
+      display.innerHTML = sources.map(s => `<li><a href="${escapeHtml(s)}" target="_blank">${escapeHtml(s)}</a></li>`).join('');
+    }
+
+    function updateConfidenceBadge() {
+      const level = document.getElementById('confidence_level').value;
+      const badge = document.getElementById('confidence_badge');
+      badge.className = `badge ${level}`;
+      badge.textContent = level.toUpperCase();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function getContent() {
+      const report = content.research_report || {};
+      const findingsText = document.getElementById('key_findings').value;
+      const sourcesText = document.getElementById('sources').value;
+
+      return {
+        research_report: {
+          meta: report.meta || {},
+          topic: document.getElementById('topic').value,
+          summary: document.getElementById('summary').value,
+          key_findings: findingsText.split('\n').filter(f => f.trim()),
+          sources: sourcesText.split('\n').filter(s => s.trim()),
+          detailed_analysis: document.getElementById('detailed_analysis').value,
+          confidence_level: document.getElementById('confidence_level').value
+        }
+      };
+    }
+
+    function notifyChange() {
+      FormBridge.send('FORM_CONTENT_CHANGED', { content: getContent() });
+    }
+  </script>
+</body>
+</html>
