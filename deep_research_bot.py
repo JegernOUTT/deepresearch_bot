@@ -24,7 +24,7 @@ logger = logging.getLogger("bot_deep_research")
 
 
 BOT_NAME = "deep_research"
-BOT_VERSION = "0.0.9"
+BOT_VERSION = "0.0.11"
 
 
 # Tool for initiating web research
@@ -209,9 +209,10 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
         elif effective_date_filter == "last_year":
             timelimit = "y"
 
-        region = "wt-wt"
         research_language = setup.get("research_language", "en")
-        if research_language and research_language != "en":
+        if research_language == "en":
+            region = "en-us"
+        else:
             region = f"{research_language}-{research_language}"
 
         all_results = []
@@ -225,7 +226,11 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
 
                         if not results:
                             logger.warning(f"DDGS returned empty results for query '{query}' with region={region}, timelimit={timelimit}")
+                        else:
+                            logger.info(f"Query '{query}' returned {len(results)} results")
+                            logger.debug(f"Raw DDGS results for query '{query}': {json.dumps(results, indent=2)}")
 
+                        query_keywords = set(query.lower().split())
                         query_results = {
                             "query": query,
                             "results": [
@@ -237,8 +242,20 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
                                 for r in results
                             ],
                         }
+
+                        irrelevant_count = 0
+                        for idx, r in enumerate(results):
+                            result_text = f"{r.get('title', '')} {r.get('body', '')}".lower()
+                            matching_keywords = [kw for kw in query_keywords if kw in result_text]
+                            if len(matching_keywords) < len(query_keywords) / 2:
+                                irrelevant_count += 1
+                                logger.warning(f"Result #{idx+1} for query '{query}' may be irrelevant - only {len(matching_keywords)}/{len(query_keywords)} keywords matched: {r.get('title', '')[:100]}")
+
+                        if irrelevant_count > len(results) / 2:
+                            query_results["relevance_warning"] = f"{irrelevant_count}/{len(results)} results may not be relevant to the query"
+                            logger.warning(f"Query '{query}': {irrelevant_count}/{len(results)} results appear irrelevant")
+
                         all_results.append(query_results)
-                        logger.info(f"Query '{query}' returned {len(results)} results")
                     except Exception as e:
                         logger.error(f"DDGS search exception for query '{query}': {type(e).__name__}: {e}", exc_info=True)
                         all_results.append({"query": query, "error": f"{type(e).__name__}: {str(e)}"})
@@ -257,6 +274,7 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
         focus = model_produced_args.get("focus")
 
         logger.info(f"read_article called with {len(urls)} URLs, focus={focus}")
+        logger.debug("read_article is not subject to research depth limit")
 
         if not urls:
             logger.warning("read_article called with no URLs")
