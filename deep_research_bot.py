@@ -24,7 +24,7 @@ logger = logging.getLogger("bot_deep_research")
 
 
 BOT_NAME = "deep_research"
-BOT_VERSION = "0.0.11"
+BOT_VERSION = "0.0.13"
 
 
 # Tool for initiating web research
@@ -221,8 +221,17 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
             with DDGS() as ddgs:
                 for query in queries:
                     try:
-                        logger.debug(f"Executing search query: '{query}'")
-                        results = list(ddgs.text(query, region=region, timelimit=timelimit, max_results=max_results))
+                        enhanced_query = query
+                        query_lower = query.lower()
+                        if any(kw in query_lower for kw in ["ai", "ml", "artificial intelligence", "machine learning", "technology", "tech", "startup", "innovation"]):
+                            enhanced_query = f"{query} (site:techcrunch.com OR site:theverge.com OR site:arstechnica.com OR site:wired.com OR site:technologyreview.com OR site:venturebeat.com)"
+                        elif any(kw in query_lower for kw in ["business", "market", "finance", "economy", "industry", "company"]):
+                            enhanced_query = f"{query} (site:bloomberg.com OR site:forbes.com OR site:reuters.com OR site:wsj.com OR site:ft.com OR site:businessinsider.com)"
+                        elif any(kw in query_lower for kw in ["science", "research", "study", "academic"]):
+                            enhanced_query = f"{query} (site:nature.com OR site:sciencedirect.com OR site:arxiv.org OR site:scholar.google.com OR site:plos.org)"
+
+                        logger.debug(f"Executing search query: '{enhanced_query}' (original: '{query}')")
+                        results = list(ddgs.text(enhanced_query, region=region, timelimit=timelimit, max_results=max_results))
 
                         if not results:
                             logger.warning(f"DDGS returned empty results for query '{query}' with region={region}, timelimit={timelimit}")
@@ -231,29 +240,47 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
                             logger.debug(f"Raw DDGS results for query '{query}': {json.dumps(results, indent=2)}")
 
                         query_keywords = set(query.lower().split())
-                        query_results = {
-                            "query": query,
-                            "results": [
-                                {
+
+                        filtered_results = []
+                        skipped_count = 0
+                        for r in results:
+                            result_text = f"{r.get('title', '')} {r.get('body', '')}".lower()
+
+                            should_skip = False
+                            if any(kw in query_lower for kw in ["ai", "ml", "artificial intelligence", "machine learning"]):
+                                ai_keywords = ["ai", "artificial intelligence", "machine learning", "ml", "neural", "model", "algorithm", "deep learning", "llm"]
+                                if not any(ai_kw in result_text for ai_kw in ai_keywords):
+                                    should_skip = True
+                                    skipped_count += 1
+                                    logger.info(f"Skipping result without AI/ML keywords: {r.get('title', '')[:80]}")
+
+                            if not should_skip:
+                                filtered_results.append({
                                     "title": r.get("title", ""),
                                     "url": r.get("href", ""),
                                     "snippet": r.get("body", ""),
-                                }
-                                for r in results
-                            ],
+                                })
+
+                        query_results = {
+                            "query": query,
+                            "results": filtered_results,
                         }
 
+                        if skipped_count > 0:
+                            query_results["filtered_info"] = f"{skipped_count} irrelevant results filtered out"
+                            logger.info(f"Filtered {skipped_count}/{len(results)} irrelevant results for query '{query}'")
+
                         irrelevant_count = 0
-                        for idx, r in enumerate(results):
-                            result_text = f"{r.get('title', '')} {r.get('body', '')}".lower()
+                        for idx, result in enumerate(filtered_results):
+                            result_text = f"{result['title']} {result['snippet']}".lower()
                             matching_keywords = [kw for kw in query_keywords if kw in result_text]
                             if len(matching_keywords) < len(query_keywords) / 2:
                                 irrelevant_count += 1
-                                logger.warning(f"Result #{idx+1} for query '{query}' may be irrelevant - only {len(matching_keywords)}/{len(query_keywords)} keywords matched: {r.get('title', '')[:100]}")
+                                logger.warning(f"Result #{idx+1} for query '{query}' may be irrelevant - only {len(matching_keywords)}/{len(query_keywords)} keywords matched: {result['title'][:100]}")
 
-                        if irrelevant_count > len(results) / 2:
-                            query_results["relevance_warning"] = f"{irrelevant_count}/{len(results)} results may not be relevant to the query"
-                            logger.warning(f"Query '{query}': {irrelevant_count}/{len(results)} results appear irrelevant")
+                        if irrelevant_count > len(filtered_results) / 2 and len(filtered_results) > 0:
+                            query_results["relevance_warning"] = f"{irrelevant_count}/{len(filtered_results)} results may not be relevant to the query"
+                            logger.warning(f"Query '{query}': {irrelevant_count}/{len(filtered_results)} results appear irrelevant")
 
                         all_results.append(query_results)
                     except Exception as e:

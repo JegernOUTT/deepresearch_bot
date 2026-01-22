@@ -98,7 +98,7 @@ deep_research_setup_schema = [
     {
         "bs_name": "max_research_depth",
         "bs_type": "int",
-        "bs_default": 10,
+        "bs_default": 20,
         "bs_group": "Research Limits",
         "bs_order": 1,
         "bs_importance": 1,
@@ -127,12 +127,21 @@ RESEARCH_DEFAULT_LARK = f"""
 print("Processing %d messages" % len(messages))
 msg = messages[-1]
 
-# Handle direct user queries - treat them as research tasks
+# Handle direct user queries - create kanban task if no assigned task
 if msg["role"] == "user":
     content = str(msg.get("content", ""))
     if content and len(content) > 10:
-        print("Processing direct user query as research task")
-        post_cd_instruction = "Begin researching this topic using web_research() with relevant queries."
+        print("Processing direct user query")
+
+        # Check if there's an assigned task
+        assigned_task = kanban_task if 'kanban_task' in dir() and kanban_task else None
+
+        if not assigned_task:
+            print("No assigned task found - creating kanban task for user query")
+            post_cd_instruction = '''Create a kanban task for this research query using kanban_newtask(), then begin researching using web_research() with relevant queries.'''
+        else:
+            print("Assigned task exists - proceeding with research")
+            post_cd_instruction = "Begin researching this topic using web_research() with relevant queries."
 
 if msg["role"] == "assistant":
     content = str(msg.get("content", ""))
