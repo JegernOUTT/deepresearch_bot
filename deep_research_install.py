@@ -126,6 +126,14 @@ RESEARCH_DEFAULT_LARK = f"""
 # Main research bot logic
 print("Processing %d messages" % len(messages))
 msg = messages[-1]
+
+# Handle direct user queries - treat them as research tasks
+if msg["role"] == "user":
+    content = str(msg.get("content", ""))
+    if content and len(content) > 10:
+        print("Processing direct user query as research task")
+        post_cd_instruction = "Begin researching this topic using web_research() with relevant queries."
+
 if msg["role"] == "assistant":
     content = str(msg.get("content", ""))
     tool_calls = str(msg.get("tool_calls", ""))

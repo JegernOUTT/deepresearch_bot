@@ -24,7 +24,7 @@ logger = logging.getLogger("bot_deep_research")
 
 
 BOT_NAME = "deep_research"
-BOT_VERSION = "0.0.7"
+BOT_VERSION = "0.0.9"
 
 
 # Tool for initiating web research
@@ -222,6 +222,10 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
                     try:
                         logger.debug(f"Executing search query: '{query}'")
                         results = list(ddgs.text(query, region=region, timelimit=timelimit, max_results=max_results))
+
+                        if not results:
+                            logger.warning(f"DDGS returned empty results for query '{query}' with region={region}, timelimit={timelimit}")
+
                         query_results = {
                             "query": query,
                             "results": [
@@ -236,11 +240,11 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
                         all_results.append(query_results)
                         logger.info(f"Query '{query}' returned {len(results)} results")
                     except Exception as e:
-                        logger.error(f"Search error for query '{query}': {e}")
-                        all_results.append({"query": query, "error": str(e)})
+                        logger.error(f"DDGS search exception for query '{query}': {type(e).__name__}: {e}", exc_info=True)
+                        all_results.append({"query": query, "error": f"{type(e).__name__}: {str(e)}"})
         except Exception as e:
-            logger.error(f"DDGS initialization error: {e}")
-            return f"Error: Failed to initialize search: {e}"
+            logger.error(f"DDGS initialization error: {type(e).__name__}: {e}", exc_info=True)
+            return f"Error: Failed to initialize search: {type(e).__name__}: {e}"
 
         successful_queries = len([r for r in all_results if "error" not in r])
         failed_queries = len([r for r in all_results if "error" in r])
