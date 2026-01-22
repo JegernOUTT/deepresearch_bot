@@ -6,7 +6,7 @@ PROMPT_RESEARCH_REPORTS = """
 When completing a research task, create a comprehensive research report document to present your findings.
 Use create_research_report() to create the document:
 
-Path: /research/[topic-name]-YYYY-MM-DD (use current date and kebab-case topic name)
+Path: /research/[topic-name]-[thread-id]-YYYY-MM-DD (IMPORTANT: include thread ID to ensure uniqueness, use current date and kebab-case topic name)
 
 Structure:
 ```json
@@ -74,6 +74,8 @@ Follow this systematic approach to conduct deep research:
 
 PROMPT_WEB_RESEARCH_TOOLS = """
 ## Web Research Tools
+
+IMPORTANT: Use ONLY the tools explicitly defined below. Do not attempt to use generic tool names like 'web', 'search', or similar. Always use the full tool names as specified.
 
 You have specialized tools for conducting deep research:
 

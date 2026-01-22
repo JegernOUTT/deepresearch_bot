@@ -24,7 +24,7 @@ logger = logging.getLogger("bot_deep_research")
 
 
 BOT_NAME = "deep_research"
-BOT_VERSION = "0.0.6"
+BOT_VERSION = "0.0.11"
 
 
 # Tool for initiating web research
@@ -139,7 +139,10 @@ TOOLS_SUBCHAT = [
 async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_bot_exec.RobotContext) -> None:
     from deep_research_install import deep_research_setup_schema
 
+    logger.info(f"Starting deep_research_main_loop for persona {rcx.persona.persona_id}")
+
     setup = ckit_bot_exec.official_setup_mixing_procedure(deep_research_setup_schema, rcx.persona.persona_setup)
+    logger.info(f"Bot setup: max_research_depth={setup.get('max_research_depth')}, research_language={setup.get('research_language')}, date_range={setup.get('date_range')}")
 
     mongo_conn_str = await ckit_mongo.mongo_fetch_creds(fclient, rcx.persona.persona_id)
     mongo = AsyncMongoClient(mongo_conn_str)
@@ -151,6 +154,7 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
 
     # Track research depth usage per thread
     research_depth_used = {}
+    logger.debug("Research depth tracking initialized")
 
     @rcx.on_updated_message
     async def updated_message_in_db(msg: ckit_ask_model.FThreadMessageOutput):
@@ -171,19 +175,29 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
         max_results = model_produced_args.get("max_results_per_query", 5)
         date_filter = model_produced_args.get("date_filter")
 
+        logger.info(f"web_research called with {len(queries)} queries, max_results={max_results}, date_filter={date_filter}")
+
         if not queries:
+            logger.warning("web_research called with no queries")
             return "Error: No search queries provided."
 
+        if not isinstance(queries, list):
+            logger.error(f"web_research called with invalid queries type: {type(queries)}")
+            return "Error: queries parameter must be a list."
+
         if len(queries) > 5:
-            return f"Error: Maximum 5 queries allowed per call. You provided {len(queries)}."
+            logger.warning(f"web_research called with {len(queries)} queries, exceeding max of 5")
+            return f"Error: Maximum 5 queries allowed per call. You provided {len(queries)}. Please reduce the number of queries."
 
         used = research_depth_used.get(toolcall.fcall_ft_id, 0)
         remaining = setup["max_research_depth"] - used
 
         if len(queries) > remaining:
+            logger.warning(f"Research depth limit reached: {used}/{setup['max_research_depth']} used, {len(queries)} requested")
             return f"Error: Research depth limit reached. Only {remaining}/{setup['max_research_depth']} queries remaining for this thread."
 
         research_depth_used[toolcall.fcall_ft_id] = used + len(queries)
+        logger.info(f"Research depth updated: {research_depth_used[toolcall.fcall_ft_id]}/{setup['max_research_depth']} used")
 
         effective_date_filter = date_filter if date_filter else setup.get("date_range", "any")
 
@@ -195,17 +209,28 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
         elif effective_date_filter == "last_year":
             timelimit = "y"
 
-        region = "wt-wt"
         research_language = setup.get("research_language", "en")
-        if research_language and research_language != "en":
+        if research_language == "en":
+            region = "en-us"
+        else:
             region = f"{research_language}-{research_language}"
 
         all_results = []
         try:
+            logger.debug(f"Initializing DDGS with region={region}, timelimit={timelimit}")
             with DDGS() as ddgs:
                 for query in queries:
                     try:
+                        logger.debug(f"Executing search query: '{query}'")
                         results = list(ddgs.text(query, region=region, timelimit=timelimit, max_results=max_results))
+
+                        if not results:
+                            logger.warning(f"DDGS returned empty results for query '{query}' with region={region}, timelimit={timelimit}")
+                        else:
+                            logger.info(f"Query '{query}' returned {len(results)} results")
+                            logger.debug(f"Raw DDGS results for query '{query}': {json.dumps(results, indent=2)}")
+
+                        query_keywords = set(query.lower().split())
                         query_results = {
                             "query": query,
                             "results": [
@@ -217,14 +242,30 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
                                 for r in results
                             ],
                         }
+
+                        irrelevant_count = 0
+                        for idx, r in enumerate(results):
+                            result_text = f"{r.get('title', '')} {r.get('body', '')}".lower()
+                            matching_keywords = [kw for kw in query_keywords if kw in result_text]
+                            if len(matching_keywords) < len(query_keywords) / 2:
+                                irrelevant_count += 1
+                                logger.warning(f"Result #{idx+1} for query '{query}' may be irrelevant - only {len(matching_keywords)}/{len(query_keywords)} keywords matched: {r.get('title', '')[:100]}")
+
+                        if irrelevant_count > len(results) / 2:
+                            query_results["relevance_warning"] = f"{irrelevant_count}/{len(results)} results may not be relevant to the query"
+                            logger.warning(f"Query '{query}': {irrelevant_count}/{len(results)} results appear irrelevant")
+
                         all_results.append(query_results)
                     except Exception as e:
-                        logger.error(f"Search error for query '{query}': {e}")
-                        all_results.append({"query": query, "error": str(e)})
+                        logger.error(f"DDGS search exception for query '{query}': {type(e).__name__}: {e}", exc_info=True)
+                        all_results.append({"query": query, "error": f"{type(e).__name__}: {str(e)}"})
         except Exception as e:
-            logger.error(f"DDGS initialization error: {e}")
-            return f"Error: Failed to initialize search: {e}"
+            logger.error(f"DDGS initialization error: {type(e).__name__}: {e}", exc_info=True)
+            return f"Error: Failed to initialize search: {type(e).__name__}: {e}"
 
+        successful_queries = len([r for r in all_results if "error" not in r])
+        failed_queries = len([r for r in all_results if "error" in r])
+        logger.info(f"web_research completed: {successful_queries} successful, {failed_queries} failed queries")
         return json.dumps(all_results, indent=2)
 
     @rcx.on_tool_call(READ_ARTICLE_TOOL.name)
@@ -232,15 +273,25 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
         urls = model_produced_args.get("urls", [])
         focus = model_produced_args.get("focus")
 
+        logger.info(f"read_article called with {len(urls)} URLs, focus={focus}")
+        logger.debug("read_article is not subject to research depth limit")
+
         if not urls:
+            logger.warning("read_article called with no URLs")
             return "Error: No URLs provided."
 
+        if not isinstance(urls, list):
+            logger.error(f"read_article called with invalid urls type: {type(urls)}")
+            return "Error: urls parameter must be a list."
+
         if len(urls) > 10:
+            logger.warning(f"read_article called with {len(urls)} URLs, exceeding max of 10")
             return f"Error: Maximum 10 URLs allowed per call. You provided {len(urls)}."
 
         results = []
         for url in urls:
             try:
+                logger.debug(f"Downloading article from {url}")
                 article = Article(url)
                 article.download()
                 article.parse()
@@ -254,16 +305,47 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
                     "summary": article.text[:500] + "..." if len(article.text) > 500 else article.text,
                 }
                 results.append(result)
+                logger.info(f"Successfully read article from {url}")
             except Exception as e:
-                logger.error(f"Error reading article {url}: {e}")
-                results.append({"url": url, "error": str(e)})
+                error_type = type(e).__name__
+                error_msg = str(e)
+                logger.error(f"Error reading article {url}: {error_type}: {error_msg}")
 
+                error_category = "unknown_error"
+                user_message = error_msg
+
+                if "404" in error_msg or "Not Found" in error_msg:
+                    error_category = "http_404"
+                    user_message = "Article not found (404). The URL may be invalid or the content has been removed."
+                elif "403" in error_msg or "Forbidden" in error_msg:
+                    error_category = "http_403"
+                    user_message = "Access forbidden (403). The website may be blocking automated access."
+                elif "timeout" in error_msg.lower():
+                    error_category = "timeout"
+                    user_message = "Request timed out. The website may be slow or unreachable."
+                elif "connection" in error_msg.lower() or "unreachable" in error_msg.lower():
+                    error_category = "connection_error"
+                    user_message = "Connection error. The website may be down or unreachable."
+                elif "ssl" in error_msg.lower() or "certificate" in error_msg.lower():
+                    error_category = "ssl_error"
+                    user_message = "SSL/Certificate error. The website may have security issues."
+
+                results.append({
+                    "url": url,
+                    "error": user_message,
+                    "error_type": error_category,
+                    "error_details": error_msg
+                })
+
+        logger.info(f"read_article completed: {len([r for r in results if 'error' not in r])} successful, {len([r for r in results if 'error' in r])} failed")
         return json.dumps(results, indent=2)
 
     @rcx.on_tool_call(CREATE_RESEARCH_REPORT_TOOL.name)
     async def toolcall_create_research_report(toolcall: ckit_cloudtool.FCloudtoolCall, model_produced_args: Dict[str, Any]) -> str:
         path = model_produced_args["path"]
         report = model_produced_args["report"]
+
+        logger.info(f"create_research_report called for path: {path}, topic: {report.get('topic', 'unknown')}")
 
         research_report_doc = {
             "research_report": {
@@ -275,9 +357,14 @@ async def deep_research_main_loop(fclient: ckit_client.FlexusClient, rcx: ckit_b
             }
         }
 
-        fuser_id = ckit_external_auth.get_fuser_id_from_rcx(rcx, toolcall.fcall_ft_id)
-        await pdoc_integration.pdoc_create(path, json.dumps(research_report_doc, indent=2), fuser_id)
-        return f"📊 Research report created at: {path}\n\nTopic: {report['topic']}\nConfidence: {report['confidence_level']}\nSources: {len(report['sources'])}"
+        try:
+            fuser_id = ckit_external_auth.get_fuser_id_from_rcx(rcx, toolcall.fcall_ft_id)
+            await pdoc_integration.pdoc_create(path, json.dumps(research_report_doc, indent=2), fuser_id)
+            logger.info(f"Research report successfully created at {path}")
+            return f"📊 Research report created at: {path}\n\nTopic: {report['topic']}\nConfidence: {report['confidence_level']}\nSources: {len(report['sources'])}"
+        except Exception as e:
+            logger.error(f"Failed to create research report at {path}: {e}")
+            return f"Error: Failed to create research report: {str(e)}"
 
     @rcx.on_tool_call(fi_mongo_store.MONGO_STORE_TOOL.name)
     async def toolcall_mongo_store(toolcall: ckit_cloudtool.FCloudtoolCall, model_produced_args: Dict[str, Any]) -> str:
