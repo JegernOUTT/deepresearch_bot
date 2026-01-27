@@ -6,17 +6,15 @@
   <title>Research Report</title>
   <link rel="stylesheet" href="https://unpkg.com/primeicons@7.0.0/primeicons.css">
   <style>
-    /* Animations */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    /* Paper on dark desk pattern - matches WorksheetEditor.vue, theme-aware */
     body { background: var(--p-content-hover-background); margin: 0; padding: 10px; }
     .paper {
-      width: 600px; padding: 24px; min-height: calc(100vh - 20px);
+      width: 700px; padding: 32px; min-height: calc(100vh - 20px);
       background: var(--p-primary-contrast-color); color: var(--p-primary-color);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); line-height: 1.6;
     }
     .meta-box {
       width: 100%; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 2rem; padding: 1rem;
@@ -29,47 +27,75 @@
     }
     .header-row { display: flex; gap: 0.5rem; }
     .header-row label { font-weight: 600; color: var(--p-text-muted-color); }
-    h1 { font-size: 1.5rem; font-weight: 600; color: var(--p-primary-color); margin: 0 0 1.5rem 0; }
-    .field { margin-bottom: 1.5rem; width: 100%; animation: fadeIn 0.4s ease-out; }
-    .field > label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.875rem; }
-    input, textarea, select {
-      border: 1px solid var(--p-surface-border); border-radius: 6px;
-      padding: 0.5rem 0.75rem; font-size: 1rem; font-family: inherit; box-sizing: border-box;
-      background: var(--p-content-hover-background); color: var(--p-text-color);
-      transition: border-color 0.15s ease; width: 100%;
+    h1 { font-size: 1.8rem; font-weight: 600; color: var(--p-primary-color); margin: 0 0 1.5rem 0; }
+    h2 { font-size: 1.2rem; font-weight: 600; color: var(--p-primary-color); margin: 2rem 0 1rem 0; border-bottom: 2px solid var(--p-primary-color); padding-bottom: 0.5rem; }
+    .section { margin-bottom: 2rem; animation: fadeIn 0.4s ease-out; }
+    .section > label { display: block; font-weight: 600; margin-bottom: 0.75rem; font-size: 1rem; color: var(--p-text-color); }
+    .executive-summary {
+      padding: 1.5rem; background: var(--p-content-hover-background);
+      border-left: 4px solid var(--p-primary-color); border-radius: 4px; margin-bottom: 2rem;
     }
-    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--p-primary-color); }
-    select option { background: var(--p-content-hover-background); color: var(--p-text-color); }
-    textarea {
-      resize: vertical; min-height: 80px; font-family: inherit; line-height: 1.5;
+    .research-questions {
+      list-style: none; padding: 0; margin: 0;
     }
-    textarea.large { min-height: 200px; }
+    .research-questions li {
+      padding: 0.75rem; margin-bottom: 0.5rem; background: var(--p-content-hover-background);
+      border-radius: 4px; position: relative; padding-left: 2.5rem;
+    }
+    .research-questions li:before {
+      content: "?"; position: absolute; left: 0.75rem; font-weight: bold;
+      color: var(--p-primary-color); font-size: 1.2rem;
+    }
+    .key-findings {
+      list-style: none; padding: 0; margin: 0;
+    }
+    .key-finding {
+      padding: 1rem; margin-bottom: 1rem; border-radius: 6px;
+      background: var(--p-content-hover-background); border-left: 4px solid var(--p-primary-color);
+    }
+    .finding-theme {
+      font-weight: 700; font-size: 1rem; color: var(--p-primary-color); margin-bottom: 0.5rem;
+    }
+    .finding-text {
+      margin-bottom: 0.5rem; line-height: 1.6;
+    }
+    .finding-citations {
+      font-size: 0.85rem; color: var(--p-text-muted-color); font-style: italic;
+    }
+    .sources-list {
+      list-style: none; padding: 0; margin: 0; counter-reset: source-counter;
+    }
+    .source-item {
+      padding: 0.75rem; margin-bottom: 0.75rem; border-left: 3px solid var(--p-primary-color);
+      background: var(--p-content-hover-background); border-radius: 4px; counter-increment: source-counter;
+      position: relative; padding-left: 2.5rem;
+    }
+    .source-item:before {
+      content: "[" counter(source-counter) "]"; position: absolute; left: 0.75rem;
+      font-weight: bold; color: var(--p-primary-color);
+    }
+    .source-title { font-weight: 600; margin-bottom: 0.25rem; }
+    .source-url { font-size: 0.85rem; color: var(--p-primary-color); word-break: break-all; }
+    .source-type { font-size: 0.75rem; color: var(--p-text-muted-color); text-transform: uppercase; margin-top: 0.25rem; }
+    .conclusions {
+      padding: 1.5rem; background: var(--p-content-hover-background);
+      border-radius: 8px; margin-bottom: 2rem; line-height: 1.7;
+    }
+    .metadata-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem;
+    }
+    .metadata-item {
+      padding: 0.75rem; background: var(--p-content-hover-background); border-radius: 4px;
+    }
+    .metadata-label { font-size: 0.75rem; color: var(--p-text-muted-color); font-weight: 600; text-transform: uppercase; }
+    .metadata-value { font-size: 1rem; font-weight: 600; margin-top: 0.25rem; }
     .badge {
-      display: inline-block; padding: 0.25rem 0.75rem; border-radius: 12px;
-      font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+      display: inline-block; padding: 0.35rem 0.85rem; border-radius: 12px;
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
     }
     .badge.high { background: #d4edda; color: #155724; }
     .badge.medium { background: #fff3cd; color: #856404; }
     .badge.low { background: #f8d7da; color: #721c24; }
-    .sources-list {
-      list-style: none; padding: 0; margin: 0;
-    }
-    .sources-list li {
-      padding: 0.5rem; margin-bottom: 0.5rem; border-left: 3px solid var(--p-primary-color);
-      background: var(--p-content-hover-background); border-radius: 4px;
-      word-break: break-all;
-    }
-    .findings-list {
-      list-style: none; padding: 0; margin: 0;
-    }
-    .findings-list li {
-      padding: 0.75rem; margin-bottom: 0.75rem; border-radius: 6px;
-      background: var(--p-content-hover-background); position: relative; padding-left: 2.5rem;
-    }
-    .findings-list li:before {
-      content: "✓"; position: absolute; left: 0.75rem; font-weight: bold;
-      color: var(--p-primary-color); font-size: 1.2rem;
-    }
   </style>
   <style id="theme-css"></style>
 </head>
@@ -79,7 +105,7 @@
       <div class="meta-label">RESEARCH_REPORT</div>
       <div class="header-row">
         <label>Created:</label>
-        <span id="meta_created">—</span>
+        <span id="meta_created_at">—</span>
       </div>
       <div class="header-row">
         <label>By:</label>
@@ -87,154 +113,150 @@
       </div>
     </div>
 
-    <h1>📊 Research Report</h1>
+    <h1 id="report_title">📊 Research Report</h1>
 
-    <div class="field">
-      <label>Research Topic</label>
-      <input type="text" id="topic" placeholder="Main research topic..." oninput="notifyChange()" readonly>
-    </div>
-
-    <div class="field">
-      <label>Confidence Level</label>
+    <div class="section">
       <div>
-        <span id="confidence_badge" class="badge medium">MEDIUM</span>
+        <span class="badge medium" id="confidence_badge">MEDIUM</span>
       </div>
-      <select id="confidence_level" onchange="updateConfidenceBadge(); notifyChange();" style="margin-top: 0.5rem;">
-        <option value="high">High - Strong evidence from multiple sources</option>
-        <option value="medium">Medium - Some uncertainty or limited sources</option>
-        <option value="low">Low - Insufficient data or conflicting information</option>
-      </select>
     </div>
 
-    <div class="field">
-      <label>Executive Summary</label>
-      <textarea id="summary" placeholder="Brief overview of key findings..." oninput="notifyChange()"></textarea>
+    <div class="section">
+      <h2>Executive Summary</h2>
+      <div class="executive-summary" id="executive_summary">
+        Loading...
+      </div>
     </div>
 
-    <div class="field">
-      <label>Key Findings</label>
-      <ul class="findings-list" id="findings_display"></ul>
-      <textarea id="key_findings" placeholder="One finding per line..." oninput="updateFindings(); notifyChange();" style="margin-top: 0.5rem;"></textarea>
+    <div class="section">
+      <h2>Research Questions</h2>
+      <ul class="research-questions" id="research_questions_list">
+        <li>Loading...</li>
+      </ul>
     </div>
 
-    <div class="field">
-      <label>Detailed Analysis</label>
-      <textarea class="large" id="detailed_analysis" placeholder="In-depth analysis with context, implications, and insights..." oninput="notifyChange()"></textarea>
+    <div class="section">
+      <h2>Key Findings</h2>
+      <div class="key-findings" id="key_findings_list">
+        Loading...
+      </div>
     </div>
 
-    <div class="field">
-      <label>Sources</label>
-      <ul class="sources-list" id="sources_display"></ul>
-      <textarea id="sources" placeholder="One URL per line..." oninput="updateSources(); notifyChange();" style="margin-top: 0.5rem;"></textarea>
+    <div class="section">
+      <h2>Sources</h2>
+      <ul class="sources-list" id="sources_list">
+        <li class="source-item">Loading...</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Conclusions & Recommendations</h2>
+      <div class="conclusions" id="conclusions">
+        Loading...
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Research Metadata</h2>
+      <div class="metadata-grid">
+        <div class="metadata-item">
+          <div class="metadata-label">Date</div>
+          <div class="metadata-value" id="research_date">—</div>
+        </div>
+        <div class="metadata-item">
+          <div class="metadata-label">Sources</div>
+          <div class="metadata-value" id="source_count">—</div>
+        </div>
+        <div class="metadata-item">
+          <div class="metadata-label">Time Spent</div>
+          <div class="metadata-value"><span id="research_time_minutes">—</span> min</div>
+        </div>
+        <div class="metadata-item">
+          <div class="metadata-label">Confidence</div>
+          <div class="metadata-value" id="confidence_text">—</div>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
-    const FormBridge = {
-      handlers: {},
-      init(name) {
-        window.addEventListener('message', e => {
-          if (e.data?.type && this.handlers[e.data.type]) {
-            this.handlers[e.data.type].forEach(h => h(e.data));
-          }
-        });
-        setTimeout(() => this.send('FORM_READY', { formName: name }), 0);
-      },
-      send(type, data) { window.parent.postMessage({ type, ...data }, '*'); },
-      on(type, handler) {
-        if (!this.handlers[type]) this.handlers[type] = [];
-        this.handlers[type].push(handler);
-      }
-    };
-
-    let content = {};
-
-    FormBridge.on('INIT', data => {
-      content = data.content || {};
-      if (data.themeCss) document.getElementById('theme-css').textContent = data.themeCss;
-      render();
-    });
-
-    FormBridge.on('CONTENT_UPDATE', data => {
-      content = data.content || {};
-      render();
-    });
-
-    FormBridge.init('deep-research-report');
-
-    function render() {
-      const report = content.research_report || {};
-      document.getElementById('topic').value = report.topic || '';
-      document.getElementById('summary').value = report.summary || '';
-      document.getElementById('detailed_analysis').value = report.detailed_analysis || '';
-      document.getElementById('confidence_level').value = report.confidence_level || 'medium';
-
-      // Render key findings as text (one per line)
-      const findings = report.key_findings || [];
-      document.getElementById('key_findings').value = findings.join('\n');
-      updateFindings();
-
-      // Render sources as text (one per line)
-      const sources = report.sources || [];
-      document.getElementById('sources').value = sources.join('\n');
-      updateSources();
-
-      // Update meta
-      const meta = report.meta || {};
-      document.getElementById('meta_created').textContent = meta.created_at || '—';
-      document.getElementById('meta_created_by').textContent = meta.created_by || '—';
-
-      updateConfidenceBadge();
-    }
-
-    function updateFindings() {
-      const text = document.getElementById('key_findings').value;
-      const findings = text.split('\n').filter(f => f.trim());
-      const display = document.getElementById('findings_display');
-      display.innerHTML = findings.map(f => `<li>${escapeHtml(f)}</li>`).join('');
-    }
-
-    function updateSources() {
-      const text = document.getElementById('sources').value;
-      const sources = text.split('\n').filter(s => s.trim());
-      const display = document.getElementById('sources_display');
-      display.innerHTML = sources.map(s => `<li><a href="${escapeHtml(s)}" target="_blank">${escapeHtml(s)}</a></li>`).join('');
-    }
-
-    function updateConfidenceBadge() {
-      const level = document.getElementById('confidence_level').value;
-      const badge = document.getElementById('confidence_badge');
-      badge.className = `badge ${level}`;
-      badge.textContent = level.toUpperCase();
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    function getContent() {
-      const report = content.research_report || {};
-      const findingsText = document.getElementById('key_findings').value;
-      const sourcesText = document.getElementById('sources').value;
-
-      return {
-        research_report: {
-          meta: report.meta || {},
-          topic: document.getElementById('topic').value,
-          summary: document.getElementById('summary').value,
-          key_findings: findingsText.split('\n').filter(f => f.trim()),
-          sources: sourcesText.split('\n').filter(s => s.trim()),
-          detailed_analysis: document.getElementById('detailed_analysis').value,
-          confidence_level: document.getElementById('confidence_level').value
-        }
-      };
-    }
+    let currentContent = null;
 
     function notifyChange() {
-      FormBridge.send('FORM_CONTENT_CHANGED', { content: getContent() });
+      if (!currentContent) return;
+      window.parent.postMessage({
+        type: "FORM_CONTENT_CHANGED",
+        content: JSON.stringify(currentContent, null, 2)
+      }, "*");
     }
+
+    function renderReport(data) {
+      if (!data.research_report) return;
+      const report = data.research_report;
+
+      document.getElementById('meta_created_at').textContent = report.meta?.created_at || '—';
+      document.getElementById('meta_created_by').textContent = report.meta?.created_by || '—';
+      document.getElementById('report_title').textContent = '📊 ' + (report.title || 'Research Report');
+
+      const confidence = report.confidence_level || 'medium';
+      const badge = document.getElementById('confidence_badge');
+      badge.className = `badge ${confidence}`;
+      badge.textContent = confidence.toUpperCase();
+
+      document.getElementById('executive_summary').innerHTML = (report.executive_summary || 'No summary available.').replace(/\n/g, '<br>');
+
+      const questionsHtml = (report.research_questions || []).map(q => `<li>${q}</li>`).join('');
+      document.getElementById('research_questions_list').innerHTML = questionsHtml || '<li>No research questions recorded.</li>';
+
+      const findingsHtml = (report.key_findings || []).map(f => `
+        <div class="key-finding">
+          <div class="finding-theme">${f.theme || 'Finding'}</div>
+          <div class="finding-text">${f.finding || ''}</div>
+          <div class="finding-citations">Sources: ${(f.citations || []).map(c => `[${c}]`).join(', ')}</div>
+        </div>
+      `).join('');
+      document.getElementById('key_findings_list').innerHTML = findingsHtml || '<div class="key-finding">No findings recorded.</div>';
+
+      const sourcesHtml = (report.sources || []).map(s => `
+        <li class="source-item">
+          <div class="source-title">${s.title || 'Untitled'}</div>
+          <a class="source-url" href="${s.url}" target="_blank">${s.url}</a>
+          <div class="source-type">${s.type || 'source'}</div>
+        </li>
+      `).join('');
+      document.getElementById('sources_list').innerHTML = sourcesHtml || '<li class="source-item">No sources recorded.</li>';
+
+      document.getElementById('conclusions').innerHTML = (report.conclusions || 'No conclusions available.').replace(/\n/g, '<br>');
+
+      document.getElementById('research_date').textContent = report.research_date || '—';
+      document.getElementById('source_count').textContent = report.source_count || '0';
+      document.getElementById('research_time_minutes').textContent = report.research_time_minutes || '—';
+      document.getElementById('confidence_text').textContent = confidence.toUpperCase();
+    }
+
+    window.addEventListener("message", (event) => {
+      if (event.data.type === "INIT") {
+        try {
+          currentContent = JSON.parse(event.data.content);
+          renderReport(currentContent);
+          if (event.data.themeCss) {
+            document.getElementById("theme-css").textContent = event.data.themeCss;
+          }
+          window.parent.postMessage({ type: "FORM_READY" }, "*");
+        } catch (e) {
+          console.error("Failed to parse content:", e);
+        }
+      } else if (event.data.type === "CONTENT_UPDATE") {
+        try {
+          currentContent = JSON.parse(event.data.content);
+          renderReport(currentContent);
+        } catch (e) {
+          console.error("Failed to parse updated content:", e);
+        }
+      }
+    });
+
+    window.parent.postMessage({ type: "FORM_READY" }, "*");
   </script>
 </body>
 </html>
