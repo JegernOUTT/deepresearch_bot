@@ -14,15 +14,18 @@ BOT_DESCRIPTION = """
 A powerful AI bot designed to conduct thorough, systematic research on any topic using advanced web search and content analysis capabilities.
 
 **Key Features:**
+- **Clarifying Questions**: Asks about scope, focus, goals, and audience before starting research
 - **Parallel Web Search**: Execute multiple search queries simultaneously for comprehensive coverage
-- **Article Analysis**: Read and extract insights from web content in parallel
+- **Article Analysis**: Read and extract insights from web content in parallel (~25 sources for medium depth)
 - **Source Cross-Referencing**: Verify information across multiple authoritative sources
-- **Structured Reports**: Generate well-organized research reports with citations
+- **Structured Reports**: Generate well-organized research reports with numbered citations
 - **Confidence Tracking**: Explicitly note uncertainty levels and source quality
+- **Slack Integration**: Receive requests and send notifications via Slack
+- **Kanban Management**: Process research tasks one at a time through inbox → todo → in progress → done
 
 **Research Capabilities:**
 - Broad exploratory research on new topics
-- Deep-dive analysis of specific subjects
+- Deep-dive analysis of specific subjects (~25 sources in 20-30 minutes)
 - Competitive analysis and market research
 - Technical documentation review
 - News and trend monitoring
@@ -48,7 +51,7 @@ deep_research_setup_schema = [
         "bs_group": "Research Approach",
         "bs_order": 1,
         "bs_importance": 0,
-        "bs_description": "Research depth: 'quick' (fast overview), 'comprehensive' (balanced), 'exhaustive' (maximum depth)",
+        "bs_description": "Research depth: 'quick' (fast overview), 'comprehensive' (balanced ~25 sources), 'exhaustive' (maximum depth)",
     },
     {
         "bs_name": "source_preference",
@@ -75,67 +78,58 @@ deep_research_setup_schema = [
         "bs_group": "Research Approach",
         "bs_order": 4,
         "bs_importance": 0,
-        "bs_description": "Date range for search results: 'any', 'last_week', 'last_month', 'last_year', 'custom'",
+        "bs_description": "Date range for search results: 'any', 'last_week', 'last_month', 'last_year'",
     },
     {
-        "bs_name": "custom_date_from",
-        "bs_type": "string_short",
+        "bs_name": "SLACK_BOT_TOKEN",
+        "bs_type": "string_long",
         "bs_default": "",
-        "bs_group": "Research Approach",
-        "bs_order": 5,
-        "bs_importance": 0,
-        "bs_description": "Start date for custom range (YYYY-MM-DD format, only used when date_range is 'custom')",
-    },
-    {
-        "bs_name": "custom_date_to",
-        "bs_type": "string_short",
-        "bs_default": "",
-        "bs_group": "Research Approach",
-        "bs_order": 6,
-        "bs_importance": 0,
-        "bs_description": "End date for custom range (YYYY-MM-DD format, only used when date_range is 'custom')",
-    },
-    {
-        "bs_name": "max_research_depth",
-        "bs_type": "int",
-        "bs_default": 10,
-        "bs_group": "Research Limits",
+        "bs_group": "Slack Integration",
         "bs_order": 1,
         "bs_importance": 1,
-        "bs_description": "Maximum number of parallel search queries allowed per research session. Higher values enable more thorough research but consume more resources.",
+        "bs_description": "Slack Bot Token (xoxb-...) for receiving research requests and posting results. Leave empty to disable Slack integration.",
     },
     {
-        "bs_name": "confidence_threshold",
-        "bs_type": "string_short",
-        "bs_default": "medium",
-        "bs_group": "Quality Control",
-        "bs_order": 1,
+        "bs_name": "SLACK_APP_TOKEN",
+        "bs_type": "string_long",
+        "bs_default": "",
+        "bs_group": "Slack Integration",
+        "bs_order": 2,
         "bs_importance": 0,
-        "bs_description": "Minimum confidence level before presenting findings: 'low' (permissive), 'medium' (balanced), 'high' (strict)",
+        "bs_description": "Slack App Token (xapp-...) for Socket Mode. Optional if using HTTP mode.",
+    },
+    {
+        "bs_name": "slack_should_join",
+        "bs_type": "bool",
+        "bs_default": True,
+        "bs_group": "Slack Integration",
+        "bs_order": 3,
+        "bs_importance": 0,
+        "bs_description": "Automatically join all public channels to listen for research requests",
+    },
+    {
+        "bs_name": "SLACK_NOTIFICATION_CHANNEL",
+        "bs_type": "string_short",
+        "bs_default": "",
+        "bs_group": "Slack Integration",
+        "bs_order": 4,
+        "bs_importance": 0,
+        "bs_description": "Slack channel name (without #) where completion notifications should be posted. Leave empty to disable notifications.",
     },
 ]
 
 
-RESEARCH_SUBCHAT_LARK = f"""
-# This subchat is for individual research operations (searches, article reads)
-print("Research subchat executing")
-subchat_result = "Research completed successfully"
-"""
-
 RESEARCH_DEFAULT_LARK = f"""
-# Main research bot logic
 print("Processing %d messages" % len(messages))
 msg = messages[-1]
 if msg["role"] == "assistant":
     content = str(msg.get("content", ""))
     tool_calls = str(msg.get("tool_calls", ""))
 
-    # Track research progress
     if "web_research" in tool_calls or "read_article" in tool_calls:
         print("Research operation in progress")
 
-    # Remind to create report if research seems complete
-    if len(messages) > 5 and "create_research_report" not in tool_calls:
+    if len(messages) > 8 and "create_research_report" not in tool_calls:
         content_lower = content.lower()
         keywords = ["conclusion", "findings", "summary", "complete"]
         matches = [k for k in keywords if k in content_lower]
@@ -161,9 +155,7 @@ async def install(
         print(f"Installing dependencies from {requirements_path}")
         subprocess.run(["pip", "install", "-r", requirements_path], check=True)
 
-    import deep_research_bot
     bot_internal_tools = json.dumps([t.openai_style_tool() for t in tools])
-    bot_subchat_tools = json.dumps([t.openai_style_tool() for t in deep_research_bot.TOOLS_SUBCHAT])
 
     await ckit_bot_install.marketplace_upsert_dev_bot(
         client,
@@ -181,11 +173,11 @@ async def install(
         marketable_run_this="python -m deep_research_bot",
         marketable_setup_default=deep_research_setup_schema,
         marketable_featured_actions=[
-            {"feat_question": "Research the latest developments in AI and machine learning", "feat_run_as_setup": False, "feat_depends_on_setup": []},
-            {"feat_question": "Analyze market trends for electric vehicles in 2024", "feat_run_as_setup": False, "feat_depends_on_setup": []},
-            {"feat_question": "Compare the top 5 project management tools", "feat_run_as_setup": False, "feat_depends_on_setup": []},
+            {"feat_question": "Research the latest developments in AI and machine learning", "feat_expert": "default", "feat_depends_on_setup": []},
+            {"feat_question": "Analyze market trends for electric vehicles in 2024", "feat_expert": "default", "feat_depends_on_setup": []},
+            {"feat_question": "Compare the top 5 project management tools", "feat_expert": "default", "feat_depends_on_setup": []},
         ],
-        marketable_intro_message="Hello! I'm Deep Research, your comprehensive research assistant. I can help you investigate any topic using systematic web research, analyze multiple sources, and create detailed reports with my findings. What would you like me to research today?",
+        marketable_intro_message="Hello! I'm Deep Research, your comprehensive research assistant. I can help you investigate any topic using systematic web research, analyze multiple sources, and create detailed reports with my findings. I'll start by asking clarifying questions to ensure the research meets your needs. What would you like me to research today?",
         marketable_preferred_model_default="grok-4-1-fast-non-reasoning",
         marketable_daily_budget_default=150_000,
         marketable_default_inbox_default=20_000,
@@ -196,21 +188,15 @@ async def install(
                 fexp_block_tools="",
                 fexp_allow_tools="",
                 fexp_app_capture_tools=bot_internal_tools,
-            )),
-            ("researcher", ckit_bot_install.FMarketplaceExpertInput(
-                fexp_system_prompt=deep_research_prompts.deep_research_prompt,
-                fexp_python_kernel=RESEARCH_SUBCHAT_LARK,
-                fexp_block_tools="",
-                fexp_allow_tools="",
-                fexp_app_capture_tools=bot_subchat_tools,
+                fexp_description="Main research expert that conducts systematic web research, asks clarifying questions, and creates comprehensive reports.",
             )),
         ],
-        marketable_tags=["Research", "Analysis", "Web Search", "Reports"],
+        marketable_tags=["Research", "Analysis", "Web Search", "Reports", "Slack"],
         marketable_picture_big_b64=open("/workspace/big_image_b64.txt").read(),
         marketable_picture_small_b64=open("/workspace/small_image_b64.txt").read(),
         marketable_schedule=[
-            prompts_common.SCHED_TASK_SORT_10M | {"sched_when": "EVERY:10m", "sched_first_question": "Check inbox for research tasks and organize them by priority."},
-            prompts_common.SCHED_TODO_5M | {"sched_when": "EVERY:5m", "sched_first_question": "Continue working on the assigned research task with systematic methodology."},
+            prompts_common.SCHED_TASK_SORT_10M | {"sched_when": "EVERY:30m", "sched_first_question": "Check inbox for research tasks and organize them by priority."},
+            prompts_common.SCHED_TODO_5M | {"sched_when": "EVERY:30m", "sched_first_question": "Continue working on the assigned research task with systematic methodology. Start by asking clarifying questions if not already done."},
         ],
         marketable_forms=ckit_bot_install.load_form_bundles(__file__),
     )
